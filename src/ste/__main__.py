@@ -440,6 +440,56 @@ def _cmd_phase_status(ns: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_ops_status(ns: argparse.Namespace) -> int:
+    import json
+
+    from ste.orchestration.ops_status import build_ops_status
+
+    req = [m.strip() for m in (ns.require or "").split(",") if m.strip()]
+    payload = build_ops_status(profile=ns.profile, required_modules=req)
+    if ns.as_json:
+        print(json.dumps(payload, indent=2, default=str))
+        return 0
+    print(f"status={payload.get('status', 'unknown')}")
+    health = payload.get("health", {})
+    print(f"health={health.get('status', 'n/a')} version={health.get('version', 'n/a')}")
+    check = payload.get("check", {})
+    print(
+        f"check_ok={check.get('ok', False)} "
+        f"core_missing={len(check.get('core_missing', []))} "
+        f"required_missing={len(check.get('required_missing', []))} "
+        f"optional_missing={len(check.get('optional_missing', []))}"
+    )
+    ph = payload.get("phase_progress", {})
+    print(
+        f"highest_ready_phase={ph.get('highest_ready_phase')} "
+        f"next_phase={ph.get('next_phase')}"
+    )
+    return 0
+
+
+def _cmd_live_min_smoke(ns: argparse.Namespace) -> int:
+    import json
+
+    from ste.execution.live_min_smoke import run_live_min_smoke
+
+    out = run_live_min_smoke(max_daily_loss_fraction=float(ns.max_daily_loss))
+    if ns.as_json:
+        print(json.dumps(out, indent=2, default=str))
+    else:
+        mt5_state = "OK" if out.get("mt5_available") else "MISSING"
+        ks = out.get("kill_switch", {})
+        passed = bool(out.get("passed", False))
+        state = "PASS" if passed else "FAIL"
+        print(
+            f"{state} mt5={mt5_state} "
+            f"halt={ks.get('trading_halt')} "
+            f"pre_trade={ks.get('pre_trade_allowed')} "
+            f"post_trade={ks.get('post_trade_allowed')}"
+        )
+    return 0 if bool(out.get("passed", False)) else 4
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(prog="ste", description="Sistema de Trading Evolutivo (STE).")
     ap.add_argument(
@@ -605,6 +655,36 @@ def main() -> int:
     )
     s.add_argument("--json", action="store_true", dest="as_json", help="Salida JSON")
     s.set_defaults(_fn=_cmd_phase_status)
+
+    s = sub.add_parser("ops-status", help="Vista operativa unificada (health/check/phase)")
+    s.add_argument(
+        "--profile",
+        type=str,
+        default="api",
+        choices=sorted((*CHECK_PROFILES, CHECK_ALL_PROFILE)),
+        help="Perfil de check para la vista operativa",
+    )
+    s.add_argument(
+        "--require",
+        type=str,
+        default="",
+        help="Módulos extra requeridos (CSV) para check",
+    )
+    s.add_argument("--json", action="store_true", dest="as_json", help="Salida JSON")
+    s.set_defaults(_fn=_cmd_ops_status)
+
+    s = sub.add_parser(
+        "live-min-smoke",
+        help="Smoke LIVE_MIN: adapter MT5 + kill switch sin capital real",
+    )
+    s.add_argument(
+        "--max-daily-loss",
+        type=float,
+        default=0.01,
+        help="Límite fraccional para disparar kill switch en prueba",
+    )
+    s.add_argument("--json", action="store_true", dest="as_json", help="Salida JSON")
+    s.set_defaults(_fn=_cmd_live_min_smoke)
 
     s = sub.add_parser(
         "serve",

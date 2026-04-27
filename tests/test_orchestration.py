@@ -237,3 +237,17 @@ def test_post_eval_gate_v1(tmp_path: Path) -> None:
     assert len(d["failures"]) >= 1
     assert "metrics" in d
     assert "equity_final" in d["metrics"]
+
+
+def test_get_ops_status_v1() -> None:
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+    from ste.orchestration.app import build_app
+
+    r = TestClient(build_app()).get("/ops/status")
+    assert r.status_code == 200
+    d = r.json()
+    assert "status" in d
+    assert "health" in d
+    assert "check" in d
+    assert "phase_progress" in d

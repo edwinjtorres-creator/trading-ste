@@ -73,6 +73,40 @@ def test_m_ste_phase_status_action_plan() -> None:
         assert "progress pending=" in o
 
 
+def test_m_ste_ops_status_json() -> None:
+    root = Path(__file__).resolve().parents[1]
+    r = subprocess.run(
+        [sys.executable, "-m", "ste", "ops-status", "--json"],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert r.returncode == 0
+    o = (r.stdout or "")
+    assert '"health"' in o
+    assert '"check"' in o
+    assert '"phase_progress"' in o
+
+
+def test_m_ste_live_min_smoke_json() -> None:
+    root = Path(__file__).resolve().parents[1]
+    r = subprocess.run(
+        [sys.executable, "-m", "ste", "live-min-smoke", "--json"],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert r.returncode in (0, 4)
+    o = (r.stdout or "")
+    assert '"mt5_available"' in o
+    assert '"kill_switch"' in o
+    assert '"passed"' in o
+
+
 def test_ste_replay_cli_missing_parquet_exit_2(tmp_path: Path) -> None:
     from ste.__main__ import _cmd_replay
 
