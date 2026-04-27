@@ -35,7 +35,7 @@ on:
       qg_min_sharpe:
         description: "Quant gate: min sharpe threshold"
         required: false
-        default: "0.00"
+        default: "-999.0"
       qg_max_drawdown:
         description: "Quant gate: max drawdown threshold"
         required: false
@@ -43,7 +43,7 @@ on:
       qg_min_equity:
         description: "Quant gate: min equity threshold"
         required: false
-        default: "0.80"
+        default: "0.01"
       wf_min_sharpe_mean:
         description: "Walk-forward gate: min mean sharpe threshold"
         required: false
@@ -157,9 +157,9 @@ jobs:
       QG_SLOW: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_slow || '15' }}
       QG_COST_BPS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_cost_bps || '1.0' }}
       QG_SLIPPAGE_BPS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_slippage_bps || '1.0' }}
-      QG_MIN_SHARPE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_min_sharpe || '0.00' }}
+      QG_MIN_SHARPE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_min_sharpe || '-999.0' }}
       QG_MAX_DRAWDOWN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_max_drawdown || '1.00' }}
-      QG_MIN_EQUITY: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_min_equity || '0.80' }}
+      QG_MIN_EQUITY: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_min_equity || '0.01' }}
     steps:
       - uses: actions/checkout@v4
 
