@@ -104,7 +104,7 @@ def test_post_replay_v1_missing_file_404() -> None:
     from fastapi.testclient import TestClient
     from ste.orchestration.app import build_app
 
-    missing = "C:/no/existe/ste_replay_404_test.parquet"
+    missing = "/tmp/ste_replay_404_test.parquet"
     r = TestClient(build_app()).post("/v1/replay", json={"file_path": missing})
     assert r.status_code == 404
     assert missing in r.json()["detail"]

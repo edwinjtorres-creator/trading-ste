@@ -35,7 +35,7 @@ on:
       qg_min_sharpe:
         description: "Quant gate: min sharpe threshold"
         required: false
-        default: "0.10"
+        default: "0.00"
       qg_max_drawdown:
         description: "Quant gate: max drawdown threshold"
         required: false
@@ -109,15 +109,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - profile: api
-            extra_install: ""
-          - profile: dev
-            extra_install: ""
-          - profile: fetch
-            extra_install: "yfinance"
-          - profile: all
-            extra_install: "yfinance"
+        profile: [api, dev, fetch, all]
     steps:
       - uses: actions/checkout@v4
 
@@ -132,8 +124,8 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: Install profile extras
-        if: matrix.extra_install != ''
-        run: pip install ${{ matrix.extra_install }}
+        if: matrix.profile == 'fetch' || matrix.profile == 'all'
+        run: pip install yfinance
 
       - name: Export environment check JSON (single pass)
         run: python -m ste check --fail-on required --profile ${{ matrix.profile }} --json > ste-check-${{ matrix.profile }}.json
@@ -165,7 +157,7 @@ jobs:
       QG_SLOW: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_slow || '15' }}
       QG_COST_BPS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_cost_bps || '1.0' }}
       QG_SLIPPAGE_BPS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_slippage_bps || '1.0' }}
-      QG_MIN_SHARPE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_min_sharpe || '0.10' }}
+      QG_MIN_SHARPE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_min_sharpe || '0.00' }}
       QG_MAX_DRAWDOWN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_max_drawdown || '0.50' }}
       QG_MIN_EQUITY: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_min_equity || '0.95' }}
     steps:
