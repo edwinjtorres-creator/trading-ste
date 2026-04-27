@@ -53,3 +53,7 @@ Operar y monitorear STE en modo seguro (paper/LIVE_MIN smoke), con decisiones cl
 
 ## Regla de seguridad
 No usar capital real hasta que `live-min-smoke` y kill switch pasen de forma consistente y con evidencia en artefactos CI.
+
+## Aprobación formal
+Antes de go-live, completar el acta:
+- `docs/GO_LIVE_APPROVAL.md`

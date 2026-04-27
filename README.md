@@ -67,6 +67,11 @@ Los jobs validan rangos antes de correr (fallan rápido si hay inputs inválidos
 - Ajustes finos opcionales:
   - `qg_size`, `qg_fast`, `qg_slow`, `qg_cost_bps`, `qg_slippage_bps`.
 
+## Go-Live
+
+- Antes de capital real, completar y aprobar: [`docs/GO_LIVE_APPROVAL.md`](docs/GO_LIVE_APPROVAL.md).
+- Operación diaria y respuesta a incidentes: [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
+
 ## Optimización local rápida (Windows)
 
 - Usar pruebas paralelas: `./scripts/test_fast.ps1` (o `./scripts/test_fast.ps1 tests/test_cli_check.py`).
