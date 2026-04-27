@@ -19,20 +19,38 @@
   },
   "2": {
     "next_actions": [
-      "Definir benchmark mínimo de walk-forward",
-      "Añadir costes/slippage en replay para shadow"
+      {
+        "text": "Definir benchmark mínimo de walk-forward",
+        "done": true
+      },
+      {
+        "text": "Añadir costes/slippage en replay para shadow",
+        "done": true
+      }
     ]
   },
   "3": {
     "next_actions": [
-      "Conectar health/check/phase-status en una vista operativa",
-      "Automatizar corridas paper por scheduler"
+      {
+        "text": "Conectar health/check/phase-status en una vista operativa",
+        "done": true
+      },
+      {
+        "text": "Automatizar corridas paper por scheduler",
+        "done": true
+      }
     ]
   },
   "4": {
     "next_actions": [
-      "Validar adapter MT5 en entorno Windows con micro-lotes",
-      "Probar kill switch operativo end-to-end antes de capital real"
+      {
+        "text": "Validar adapter MT5 en entorno Windows con micro-lotes",
+        "done": true
+      },
+      {
+        "text": "Probar kill switch operativo end-to-end antes de capital real",
+        "done": true
+      }
     ]
   }
 }

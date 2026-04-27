@@ -104,7 +104,7 @@ def test_post_replay_v1_missing_file_404() -> None:
     from fastapi.testclient import TestClient
     from ste.orchestration.app import build_app
 
-    missing = "C:/no/existe/ste_replay_404_test.parquet"
+    missing = "/tmp/ste_replay_404_test.parquet"
     r = TestClient(build_app()).post("/v1/replay", json={"file_path": missing})
     assert r.status_code == 404
     assert missing in r.json()["detail"]
@@ -237,3 +237,17 @@ def test_post_eval_gate_v1(tmp_path: Path) -> None:
     assert len(d["failures"]) >= 1
     assert "metrics" in d
     assert "equity_final" in d["metrics"]
+
+
+def test_get_ops_status_v1() -> None:
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+    from ste.orchestration.app import build_app
+
+    r = TestClient(build_app()).get("/ops/status")
+    assert r.status_code == 200
+    d = r.json()
+    assert "status" in d
+    assert "health" in d
+    assert "check" in d
+    assert "phase_progress" in d

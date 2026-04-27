@@ -36,6 +36,13 @@ def build_app():
         p: Phase = Phase.NUCLEO
         return {"phase": int(p), "description": phase_descriptions()[p]}
 
+    @app.get("/ops/status")
+    def ops_status(profile: str = "api", require: str = "") -> dict[str, Any]:
+        from ste.orchestration.ops_status import build_ops_status
+
+        req = [m.strip() for m in require.split(",") if m.strip()]
+        return build_ops_status(profile=profile, required_modules=req)
+
     @app.post(
         "/v1/replay",
         response_model=ReplayResponse,
