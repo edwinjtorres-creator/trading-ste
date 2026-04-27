@@ -1,0 +1,10 @@
+matplotlib>=3.8.0
+seaborn>=0.13.0
+plotly>=5.18.0
+bokeh>=3.2.0
+streamlit>=1.28.0
+dash>=2.15.0
+panel>=1.2.0
+holoviews>=1.18.0
+missingno>=0.5.0
+kaleido>=0.2.0

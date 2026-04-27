@@ -1,0 +1,2 @@
+# Hasta que haya rueda para tu versión de Python (a menudo 3.10-3.12)
+ray[tune]>=2.8.0

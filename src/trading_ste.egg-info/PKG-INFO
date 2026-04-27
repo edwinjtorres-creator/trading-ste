@@ -1,0 +1,45 @@
+Metadata-Version: 2.4
+Name: trading-ste
+Version: 0.1.0
+Summary: STE — Sistema de Trading Evolutivo (núcleo mínimo: señal, régimen, riesgo, verificación)
+License: Proprietary
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.24
+Requires-Dist: pyarrow>=15.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: ruff>=0.4.0; extra == "dev"
+Requires-Dist: fastapi>=0.109.0; extra == "dev"
+Requires-Dist: httpx>=0.26.0; extra == "dev"
+Requires-Dist: uvicorn[standard]>=0.27.0; extra == "dev"
+
+# trading-ste
+
+Sistema de Trading Evolutivo (STE) — núcleo mínimo con **señal**, **régimen (Hurst aproximado)**, **riesgo** (cortes diarios) y **verificación** (`pytest`). La visión de largo plazo y el **engranaje** entre capas está en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). La capa de *backtest/live* vive en `src/ste/eval/` (en expansión).
+
+**Ubicación del repo:** `C:\Users\User\Projects\trading-ste`
+
+## Estructura
+
+| Ruta | Rol |
+|------|-----|
+| `src/ste/contracts.py` | Tipos compartidos (Bar, órdenes, régimen) |
+| `src/ste/ingest/` | Parquet (roundtrip `Bar`), bares sintéticos para pruebas |
+| `src/ste/signal/` | Señal baseline (cruce de medias EMA) |
+| `src/ste/regime/` | Hurst aprox. + gating de régimen |
+| `src/ste/risk/` | Estado de riesgo y corte por pérdida diaria fraccionada |
+| `src/ste/eval/` | Walk-forward (ventanas *train/test*), *backtest* a extender |
+| `tests/` | Pruebas del núcleo |
+
+## Desarrollo
+
+1. `python -m venv .venv` y activar el venv
+2. `pip install -e ".[dev]"`
+3. `pytest`
+4. **Stack completo por capas:** `python scripts/install_layers.py` (y `--include-optional` al final
+   para TF/Ray en *optional*). Detalle en [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md). Alternativa:
+   `python scripts/merge_requirements.py` y un solo `pip install -r requirements/all.txt` (más brusco).
+5. `git init` (si aún no) y `git add . && git commit -m "STE: …"`.
+
+Nada de **capital real** en este repositorio hasta sombra/validación y *kill switch* acordados.

@@ -1,0 +1,2 @@
+# Sólo Python 3.10-3.12 (comprobar https://www.tensorflow.org/install/pip)
+tensorflow>=2.15.0

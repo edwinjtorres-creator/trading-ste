@@ -1,0 +1,38 @@
+{
+  "0": {
+    "next_actions": [
+      {
+        "text": "Mantener cobertura de tests en señal/regimen/riesgo",
+        "done": true
+      },
+      {
+        "text": "Revisar regresión de PolicyConfig ante cambios de decide()",
+        "done": false
+      }
+    ]
+  },
+  "1": {
+    "next_actions": [
+      "Fijar rutas reproducibles de ingesta a Parquet",
+      "Agregar validaciones de schema/metadata en CI"
+    ]
+  },
+  "2": {
+    "next_actions": [
+      "Definir benchmark mínimo de walk-forward",
+      "Añadir costes/slippage en replay para shadow"
+    ]
+  },
+  "3": {
+    "next_actions": [
+      "Conectar health/check/phase-status en una vista operativa",
+      "Automatizar corridas paper por scheduler"
+    ]
+  },
+  "4": {
+    "next_actions": [
+      "Validar adapter MT5 en entorno Windows con micro-lotes",
+      "Probar kill switch operativo end-to-end antes de capital real"
+    ]
+  }
+}

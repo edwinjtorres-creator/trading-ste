@@ -1,0 +1,26 @@
+{
+  "dev": {
+    "ignore_regime": true,
+    "cost_bps": 0.0,
+    "slippage_bps": 0.0,
+    "min_sharpe": null,
+    "max_drawdown": 0.95,
+    "min_equity": null
+  },
+  "staging": {
+    "ignore_regime": true,
+    "cost_bps": 5.0,
+    "slippage_bps": 2.0,
+    "min_sharpe": -0.5,
+    "max_drawdown": 0.75,
+    "min_equity": 0.7
+  },
+  "prod": {
+    "ignore_regime": true,
+    "cost_bps": 10.0,
+    "slippage_bps": 5.0,
+    "min_sharpe": 0.0,
+    "max_drawdown": 0.5,
+    "min_equity": 0.9
+  }
+}

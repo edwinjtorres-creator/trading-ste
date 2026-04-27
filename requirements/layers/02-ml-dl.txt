@@ -1,0 +1,20 @@
+torch>=2.0.0
+torchvision>=0.16.0
+torchaudio>=2.0.0
+transformers>=4.36.0
+# TensorFlow: no hay rueda para Python 3.14+; en 3.10-3.12 descomentar o usar 02-optional-tensorflow.txt
+# tensorflow>=2.15.0
+scikit-learn>=1.3.0
+xgboost>=2.0.0
+lightgbm>=4.0.0
+catboost>=1.2.0
+darts[all]>=0.24.0
+gluonts>=0.14.0
+pytorch-forecasting>=1.0.0
+prophet>=1.1.0
+neuralprophet>=0.6.0
+# autogluon: muy pesado; se incluye en *full*; descomentar con cuidado
+# autogluon>=1.0.0
+optuna>=3.0.0
+# Ray: muchas versiones limitan Python <3.14; instalar aparte en 3.10-3.12 (ver optional/ray.txt)
+# ray[tune]>=2.8.0

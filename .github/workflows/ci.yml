@@ -1,0 +1,660 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+  pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+  workflow_dispatch:
+    inputs:
+      qg_size:
+        description: "Quant gate: position size"
+        required: false
+        default: "0.25"
+      qg_fast:
+        description: "Quant gate: fast EMA window"
+        required: false
+        default: "5"
+      qg_slow:
+        description: "Quant gate: slow EMA window"
+        required: false
+        default: "15"
+      qg_cost_bps:
+        description: "Quant gate: transaction cost (bps)"
+        required: false
+        default: "1.0"
+      qg_slippage_bps:
+        description: "Quant gate: slippage (bps)"
+        required: false
+        default: "1.0"
+      qg_min_sharpe:
+        description: "Quant gate: min sharpe threshold"
+        required: false
+        default: "0.10"
+      qg_max_drawdown:
+        description: "Quant gate: max drawdown threshold"
+        required: false
+        default: "0.50"
+      qg_min_equity:
+        description: "Quant gate: min equity threshold"
+        required: false
+        default: "0.95"
+      wf_min_sharpe_mean:
+        description: "Walk-forward gate: min mean sharpe threshold"
+        required: false
+        default: "0.10"
+      wf_max_drawdown_worst:
+        description: "Walk-forward gate: max worst drawdown threshold"
+        required: false
+        default: "0.60"
+  schedule:
+    - cron: "0 3 * * *"
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: "pyproject.toml"
+
+      - name: Install package (dev)
+        run: pip install -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check src tests
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: "pyproject.toml"
+
+      - name: Install package (dev)
+        run: pip install -e ".[dev]"
+
+      - name: Pytest
+        run: pytest
+
+  env-check-profiles:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: api
+            extra_install: ""
+          - profile: dev
+            extra_install: ""
+          - profile: fetch
+            extra_install: "yfinance"
+          - profile: all
+            extra_install: "yfinance"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: "pyproject.toml"
+
+      - name: Install package (dev)
+        run: pip install -e ".[dev]"
+
+      - name: Install profile extras
+        if: matrix.extra_install != ''
+        run: pip install ${{ matrix.extra_install }}
+
+      - name: Export environment check JSON (single pass)
+        run: python -m ste check --fail-on required --profile ${{ matrix.profile }} --json > ste-check-${{ matrix.profile }}.json
+
+      - name: Upload environment check artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ste-check-${{ matrix.profile }}
+          path: ste-check-${{ matrix.profile }}.json
+
+      - name: Enforce environment check status_code
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("ste-check-${{ matrix.profile }}.json")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          code = int(data.get("status_code", 1))
+          print(f"status_code={code} profile=${{ matrix.profile }}")
+          raise SystemExit(code)
+          PY
+
+  quant-gate:
+    runs-on: ubuntu-latest
+    env:
+      QG_SIZE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_size || '0.25' }}
+      QG_FAST: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_fast || '5' }}
+      QG_SLOW: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_slow || '15' }}
+      QG_COST_BPS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_cost_bps || '1.0' }}
+      QG_SLIPPAGE_BPS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_slippage_bps || '1.0' }}
+      QG_MIN_SHARPE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_min_sharpe || '0.10' }}
+      QG_MAX_DRAWDOWN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_max_drawdown || '0.50' }}
+      QG_MIN_EQUITY: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.qg_min_equity || '0.95' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate quant gate inputs
+        run: |
+          python - <<'PY'
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          size = float("${{ env.QG_SIZE }}")
+          fast = int(float("${{ env.QG_FAST }}"))
+          slow = int(float("${{ env.QG_SLOW }}"))
+          cost_bps = float("${{ env.QG_COST_BPS }}")
+          slippage_bps = float("${{ env.QG_SLIPPAGE_BPS }}")
+          min_sharpe = float("${{ env.QG_MIN_SHARPE }}")
+          max_dd = float("${{ env.QG_MAX_DRAWDOWN }}")
+          min_equity = float("${{ env.QG_MIN_EQUITY }}")
+
+          errors = []
+          if not (0.0 < size <= 1.0):
+              errors.append(f"QG_SIZE fuera de rango (0,1]: {size}")
+          if fast < 1:
+              errors.append(f"QG_FAST debe ser >=1: {fast}")
+          if slow <= fast:
+              errors.append(f"QG_SLOW debe ser > QG_FAST: slow={slow} fast={fast}")
+          if cost_bps < 0.0:
+              errors.append(f"QG_COST_BPS debe ser >=0: {cost_bps}")
+          if slippage_bps < 0.0:
+              errors.append(f"QG_SLIPPAGE_BPS debe ser >=0: {slippage_bps}")
+          if not (0.0 <= max_dd <= 1.0):
+              errors.append(f"QG_MAX_DRAWDOWN debe estar en [0,1]: {max_dd}")
+          if min_equity <= 0.0:
+              errors.append(f"QG_MIN_EQUITY debe ser >0: {min_equity}")
+          step_summary = os.environ.get("GITHUB_STEP_SUMMARY", "")
+          ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+          if errors:
+              print("Input validation errors (quant-gate):")
+              for e in errors:
+                  print(f"- {e}")
+              if step_summary:
+                  lines = [
+                      "## Quant Gate Input Validation",
+                      "",
+                      "- Status: FAIL ❌",
+                      f"- Timestamp (UTC): `{ts}`",
+                      "- Errores:",
+                  ]
+                  lines.extend([f"  - {e}" for e in errors])
+                  Path(step_summary).write_text(
+                      "\n".join(lines) + "\n", encoding="utf-8"
+                  )
+              raise SystemExit(2)
+          if step_summary:
+              lines = [
+                  "## Quant Gate Input Validation",
+                  "",
+                  "- Status: PASS ✅",
+                  f"- Timestamp (UTC): `{ts}`",
+              ]
+              Path(step_summary).write_text("\n".join(lines) + "\n", encoding="utf-8")
+          print(
+              "quant-gate inputs ok",
+              {
+                  "size": size,
+                  "fast": fast,
+                  "slow": slow,
+                  "cost_bps": cost_bps,
+                  "slippage_bps": slippage_bps,
+                  "min_sharpe": min_sharpe,
+                  "max_drawdown": max_dd,
+                  "min_equity": min_equity,
+              },
+          )
+          PY
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: "pyproject.toml"
+
+      - name: Install package (dev)
+        run: pip install -e ".[dev]"
+
+      - name: Generate synthetic parquet for quant gate
+        run: python scripts/gen_ci_parquet.py --out .ci/quant_gate.parquet --n 180
+
+      - name: Evaluate quantitative gate
+        run: |
+          python -m ste eval-gate .ci/quant_gate.parquet --ignore-regime --size ${{ env.QG_SIZE }} --fast ${{ env.QG_FAST }} --slow ${{ env.QG_SLOW }} --cost-bps ${{ env.QG_COST_BPS }} --slippage-bps ${{ env.QG_SLIPPAGE_BPS }} --min-sharpe ${{ env.QG_MIN_SHARPE }} --max-drawdown ${{ env.QG_MAX_DRAWDOWN }} --min-equity ${{ env.QG_MIN_EQUITY }} --json > ste-eval-gate.json
+
+      - name: Build timestamped artifact name
+        id: stamp
+        run: echo "ts=$(date -u +%Y%m%dT%H%M%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload quant gate artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ste-eval-gate-${{ steps.stamp.outputs.ts }}
+          path: ste-eval-gate.json
+
+      - name: Enforce quant gate pass
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("ste-eval-gate.json")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          passed = bool(data.get("passed", False))
+          print(f"quant_gate_passed={passed}")
+          raise SystemExit(0 if passed else 4)
+          PY
+
+      - name: Publish quant gate summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("ste-eval-gate.json")
+          d = json.loads(p.read_text(encoding="utf-8"))
+          m = d.get("metrics", {})
+          passed = bool(d.get("passed", False))
+          failures = d.get("failures", [])
+          status = "PASS ✅" if passed else "FAIL ❌"
+          lines = [
+              "## Quant Gate Summary",
+              "",
+              f"- Status: {status}",
+              f"- Path: `{d.get('path', '')}`",
+              f"- Equity final: `{m.get('equity_final', 'n/a')}`",
+              f"- Sharpe: `{m.get('sharpe', 'n/a')}`",
+              f"- Max drawdown: `{m.get('max_drawdown', 'n/a')}`",
+              f"- Total cost frac: `{m.get('total_cost_frac', 'n/a')}`",
+              f"- Halted: `{m.get('halted', 'n/a')}`",
+              f"- Gate min_sharpe: `${{ env.QG_MIN_SHARPE }}`",
+              f"- Gate max_drawdown: `${{ env.QG_MAX_DRAWDOWN }}`",
+              f"- Gate min_equity: `${{ env.QG_MIN_EQUITY }}`",
+              f"- Params size/fast/slow: `${{ env.QG_SIZE }}/${{ env.QG_FAST }}/${{ env.QG_SLOW }}`",
+              f"- Costs bps/slippage bps: `${{ env.QG_COST_BPS }}/${{ env.QG_SLIPPAGE_BPS }}`",
+          ]
+          if failures:
+              lines.append("- Failures:")
+              lines.extend([f"  - {x}" for x in failures])
+          Path(".quant_summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+          cat .quant_summary.md >> "$GITHUB_STEP_SUMMARY"
+
+  walkforward-report:
+    runs-on: ubuntu-latest
+    env:
+      WF_MIN_SHARPE_MEAN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.wf_min_sharpe_mean || '0.10' }}
+      WF_MAX_DRAWDOWN_WORST: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.wf_max_drawdown_worst || '0.60' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate walk-forward gate inputs
+        run: |
+          python - <<'PY'
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          min_sharpe_mean = float("${{ env.WF_MIN_SHARPE_MEAN }}")
+          max_dd_worst = float("${{ env.WF_MAX_DRAWDOWN_WORST }}")
+          errors = []
+          if not (0.0 <= max_dd_worst <= 1.0):
+              errors.append(
+                  f"WF_MAX_DRAWDOWN_WORST debe estar en [0,1]: {max_dd_worst}"
+              )
+          step_summary = os.environ.get("GITHUB_STEP_SUMMARY", "")
+          ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+          if errors:
+              print("Input validation errors (walkforward-report):")
+              for e in errors:
+                  print(f"- {e}")
+              if step_summary:
+                  lines = [
+                      "## Walk-Forward Input Validation",
+                      "",
+                      "- Status: FAIL ❌",
+                      f"- Timestamp (UTC): `{ts}`",
+                      "- Errores:",
+                  ]
+                  lines.extend([f"  - {e}" for e in errors])
+                  Path(step_summary).write_text(
+                      "\n".join(lines) + "\n", encoding="utf-8"
+                  )
+              raise SystemExit(2)
+          if step_summary:
+              lines = [
+                  "## Walk-Forward Input Validation",
+                  "",
+                  "- Status: PASS ✅",
+                  f"- Timestamp (UTC): `{ts}`",
+              ]
+              Path(step_summary).write_text("\n".join(lines) + "\n", encoding="utf-8")
+          print(
+              "walkforward-report inputs ok",
+              {
+                  "min_sharpe_mean": min_sharpe_mean,
+                  "max_drawdown_worst": max_dd_worst,
+              },
+          )
+          PY
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: "pyproject.toml"
+
+      - name: Install package (dev)
+        run: pip install -e ".[dev]"
+
+      - name: Generate synthetic parquet for walk-forward
+        run: python scripts/gen_ci_parquet.py --out .ci/wf_report.parquet --n 240
+
+      - name: Build walk-forward report JSON
+        run: |
+          python -m ste report-wf .ci/wf_report.parquet --train 80 --test 20 --step 20 --json > ste-report-wf.json
+
+      - name: Evaluate and enforce walk-forward gate
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          min_sharpe_mean = float("${{ env.WF_MIN_SHARPE_MEAN }}")
+          max_dd_worst_limit = float("${{ env.WF_MAX_DRAWDOWN_WORST }}")
+          p = Path("ste-report-wf.json")
+          rows = json.loads(p.read_text(encoding="utf-8"))
+          n = len(rows) if isinstance(rows, list) else 0
+          failures = []
+          if n <= 0:
+              failures.append("Sin ventanas walk-forward")
+              summary = {
+                  "windows": 0,
+                  "sharpe_min": "n/a",
+                  "sharpe_max": "n/a",
+                  "sharpe_mean": "n/a",
+                  "max_dd_worst": "n/a",
+              }
+          else:
+              sharpe_vals = [float(r.get("sharpe", 0.0)) for r in rows]
+              max_dd_vals = [float(r.get("max_dd", 0.0)) for r in rows]
+              sharpe_mean = sum(sharpe_vals) / n
+              max_dd_worst = max(max_dd_vals)
+              summary = {
+                  "windows": n,
+                  "sharpe_min": min(sharpe_vals),
+                  "sharpe_max": max(sharpe_vals),
+                  "sharpe_mean": sharpe_mean,
+                  "max_dd_worst": max_dd_worst,
+              }
+              if sharpe_mean < min_sharpe_mean:
+                  failures.append(
+                      f"sharpe_mean={sharpe_mean:.6f} < min_sharpe_mean={min_sharpe_mean:.6f}"
+                  )
+              if max_dd_worst > max_dd_worst_limit:
+                  failures.append(
+                      f"max_dd_worst={max_dd_worst:.6f} > max_drawdown_worst={max_dd_worst_limit:.6f}"
+                  )
+          payload = {
+              "passed": len(failures) == 0,
+              "failures": failures,
+              "thresholds": {
+                  "min_sharpe_mean": min_sharpe_mean,
+                  "max_drawdown_worst": max_dd_worst_limit,
+              },
+              "summary": summary,
+          }
+          Path("ste-report-wf-gate.json").write_text(
+              json.dumps(payload, indent=2) + "\n", encoding="utf-8"
+          )
+          print(f"walkforward_windows={summary['windows']}")
+          print(f"walkforward_passed={payload['passed']}")
+          raise SystemExit(0 if payload["passed"] else 5)
+          PY
+
+      - name: Build timestamped artifact name
+        id: wf_stamp
+        run: echo "ts=$(date -u +%Y%m%dT%H%M%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload walk-forward artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ste-report-wf-${{ steps.wf_stamp.outputs.ts }}
+          path: |
+            ste-report-wf.json
+            ste-report-wf-gate.json
+
+      - name: Publish walk-forward summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d = json.loads(Path("ste-report-wf-gate.json").read_text(encoding="utf-8"))
+          summary = d.get("summary", {})
+          thresholds = d.get("thresholds", {})
+          failures = d.get("failures", [])
+          passed = bool(d.get("passed", False))
+          status = "PASS ✅" if passed else "FAIL ❌"
+          lines = [
+              "## Walk-Forward Summary",
+              "",
+              f"- Status: {status}",
+              f"- Windows: `{summary['windows']}`",
+              f"- Sharpe min: `{summary['sharpe_min']}`",
+              f"- Sharpe max: `{summary['sharpe_max']}`",
+              f"- Sharpe mean: `{summary['sharpe_mean']}`",
+              f"- Worst max_dd: `{summary['max_dd_worst']}`",
+              f"- Gate min_sharpe_mean: `{thresholds.get('min_sharpe_mean', 'n/a')}`",
+              f"- Gate max_drawdown_worst: `{thresholds.get('max_drawdown_worst', 'n/a')}`",
+              "- Artifact: `ste-report-wf-<timestamp>.json`",
+          ]
+          if failures:
+              lines.append("- Failures:")
+              lines.extend([f"  - {x}" for x in failures])
+          Path(".wf_summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+          cat .wf_summary.md >> "$GITHUB_STEP_SUMMARY"
+
+  smoke-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: "pyproject.toml"
+
+      - name: Install package (dev)
+        run: pip install -e ".[dev]"
+
+      - name: Generate synthetic parquet for API smoke
+        run: python scripts/gen_ci_parquet.py --out .ci/api_smoke.parquet --n 180
+
+      - name: Start API server
+        run: |
+          nohup python -m ste serve --host 127.0.0.1 --port 8765 > .ci/smoke_api.log 2>&1 &
+          echo $! > .ci/smoke_api.pid
+
+      - name: Smoke test API endpoints
+        run: |
+          python - <<'PY'
+          import json
+          import time
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          base = "http://127.0.0.1:8765"
+
+          def get_json(path: str) -> dict:
+              with urllib.request.urlopen(base + path, timeout=10) as r:
+                  if r.status != 200:
+                      raise RuntimeError(f"GET {path} status={r.status}")
+                  return json.loads(r.read().decode("utf-8"))
+
+          # Wait for server readiness.
+          for _ in range(20):
+              try:
+                  hz = get_json("/healthz")
+                  if hz.get("status") == "ok":
+                      break
+              except Exception:
+                  time.sleep(1.0)
+          else:
+              raise SystemExit("API no respondió /healthz a tiempo")
+
+          phase = get_json("/phase")
+          if "phase" not in phase or "description" not in phase:
+              raise SystemExit(f"/phase inválido: {phase}")
+
+          openapi = get_json("/openapi.json")
+          paths = openapi.get("paths", {})
+          for required_path in ("/v1/replay", "/v1/eval-gate"):
+              if required_path not in paths:
+                  raise SystemExit(
+                      f"/openapi.json no contiene {required_path}. paths={list(paths.keys())[:20]}"
+                  )
+
+          payload = {
+              "file_path": ".ci/api_smoke.parquet",
+              "ignore_regime": True,
+              "position_size": 0.25,
+              "min_sharpe": -99.0,
+              "max_drawdown": 1.0,
+              "min_equity": 0.1,
+          }
+          req = urllib.request.Request(
+              base + "/v1/eval-gate",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=20) as r:
+                  body = r.read().decode("utf-8")
+                  if r.status != 200:
+                      raise SystemExit(f"/v1/eval-gate status={r.status}: {body}")
+          except urllib.error.HTTPError as e:
+              raise SystemExit(f"/v1/eval-gate HTTPError: {e.code} {e.read().decode('utf-8')}") from e
+
+          d = json.loads(body)
+          if "passed" not in d or "metrics" not in d:
+              raise SystemExit(f"/v1/eval-gate respuesta inválida: {d}")
+
+          Path("ste-smoke-api.json").write_text(
+              json.dumps(
+                  {
+                      "healthz": hz,
+                      "phase": phase,
+                      "openapi_paths_checked": ["/v1/replay", "/v1/eval-gate"],
+                      "eval_gate": d,
+                  },
+                  indent=2,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          print("smoke_api_ok=true")
+          PY
+
+      - name: Build timestamped artifact name
+        id: smoke_stamp
+        run: echo "ts=$(date -u +%Y%m%dT%H%M%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload API smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ste-smoke-api-${{ steps.smoke_stamp.outputs.ts }}
+          path: |
+            ste-smoke-api.json
+            .ci/smoke_api.log
+
+      - name: Publish API smoke summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("ste-smoke-api.json")
+          if p.exists():
+              d = json.loads(p.read_text(encoding="utf-8"))
+              hz = d.get("healthz", {})
+              ph = d.get("phase", {})
+              eg = d.get("eval_gate", {})
+              openapi_checked = d.get("openapi_paths_checked", [])
+              openapi_ok = all(
+                  x in openapi_checked for x in ["/v1/replay", "/v1/eval-gate"]
+              )
+              status = "PASS ✅"
+              lines = [
+                  "## API Smoke Summary",
+                  "",
+                  f"- Status: {status}",
+                  f"- healthz.status: `{hz.get('status', 'n/a')}`",
+                  f"- phase: `{ph.get('phase', 'n/a')}`",
+                  f"- eval-gate.passed: `{eg.get('passed', 'n/a')}`",
+                  f"- openapi: `{'PASS ✅' if openapi_ok else 'FAIL ❌'}`",
+                  "- Artifact: `ste-smoke-api-<timestamp>.json`",
+              ]
+          else:
+              lines = [
+                  "## API Smoke Summary",
+                  "",
+                  "- Status: FAIL ❌",
+                  "- No se generó `ste-smoke-api.json` (revisar logs).",
+              ]
+          Path(".api_smoke_summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+          cat .api_smoke_summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop API server
+        if: always()
+        run: |
+          if [ -f .ci/smoke_api.pid ]; then
+            kill "$(cat .ci/smoke_api.pid)" || true
+          fi

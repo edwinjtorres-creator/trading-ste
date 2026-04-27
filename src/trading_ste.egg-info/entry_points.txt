@@ -1,0 +1,2 @@
+[console_scripts]
+ste = ste.__main__:main
