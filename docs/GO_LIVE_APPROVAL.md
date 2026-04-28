@@ -18,15 +18,15 @@ Responsable: `Edwin Torres`
 - [x] `max_daily_loss` aprobado: `0.01`
 - [x] `max_drawdown` aprobado: `1.00`
 - [x] `min_equity` aprobado: `0.01`
-- [ ] Kill switch habilitado y probado (`live-min-smoke` PASS)
+- [x] Kill switch habilitado y probado (`live-min-smoke` PASS)
 
 ## 4) Criterios de despliegue
-- [ ] CI requerido en PASS (`CI Control Tower`)
-- [ ] `quant-gate` PASS
-- [ ] `walkforward-report` PASS
-- [ ] `smoke-api` PASS
-- [ ] `paper-scheduler` revisado (último artifact OK)
-- [ ] `live-min-smoke` revisado (último artifact OK)
+- [x] CI requerido en PASS (`CI Control Tower`)
+- [x] `quant-gate` PASS
+- [x] `walkforward-report` PASS
+- [x] `smoke-api` PASS
+- [x] `paper-scheduler` revisado (último artifact OK)
+- [x] `live-min-smoke` revisado (último artifact OK)
 
 ## 5) Operación inicial
 - [x] Fecha/hora de activación: `2026-04-27 18:00 UTC`
@@ -35,8 +35,8 @@ Responsable: `Edwin Torres`
 - [ ] Responsable backup: `Pendiente de asignar`
 
 ## 6) Política de rollback
-- [ ] Condición de rollback documentada
-- [ ] Comando/procedimiento validado
+- [x] Condición de rollback documentada
+- [x] Comando/procedimiento validado
 - [x] Tiempo máximo de rollback aceptado: `15 min`
 
 ## 7) Aprobación final
@@ -51,3 +51,8 @@ Fecha/hora: `2026-04-27 13:09 -05`
 - Si cualquier check crítico falla, **no desplegar**.
 - Mantener `develop`/`master` protegidas y registrar cualquier override.
 - Toda excepción debe quedar documentada en PR/release notes.
+
+## Evidencia técnica (última validación)
+- CI final en verde: `https://github.com/edwinjtorres-creator/trading-ste/actions/runs/25051066942`
+- Commit validado: `d032491e26360b87acc2f11463a9354712fb4820`
+- Base operativa/rollback documentada en: `docs/RUNBOOK.md`
