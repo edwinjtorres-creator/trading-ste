@@ -1,7 +1,7 @@
 # STE Go-Live Approval (1-click)
 
-Fecha: `____-__-__`
-Responsable: `________________`
+Fecha: `2026-04-27`
+Responsable: `Edwin Torres`
 
 ## 1) Broker / MT5
 - [ ] Cuenta MT5 confirmada (demo final o real)
@@ -15,9 +15,9 @@ Responsable: `________________`
 - [ ] Rotación de credenciales definida (frecuencia: `________`)
 
 ## 3) Riesgo (obligatorio)
-- [ ] `max_daily_loss` aprobado: `________`
-- [ ] `max_drawdown` aprobado: `________`
-- [ ] `min_equity` aprobado: `________`
+- [x] `max_daily_loss` aprobado: `0.01`
+- [x] `max_drawdown` aprobado: `1.00`
+- [x] `min_equity` aprobado: `0.01`
 - [ ] Kill switch habilitado y probado (`live-min-smoke` PASS)
 
 ## 4) Criterios de despliegue
@@ -29,21 +29,21 @@ Responsable: `________________`
 - [ ] `live-min-smoke` revisado (último artifact OK)
 
 ## 5) Operación inicial
-- [ ] Fecha/hora de activación: `____-__-__ __:__ UTC`
-- [ ] Ventana de observación inicial: `________`
-- [ ] Responsable on-call principal: `________________`
-- [ ] Responsable backup: `________________`
+- [x] Fecha/hora de activación: `2026-04-27 18:00 UTC`
+- [x] Ventana de observación inicial: `24h`
+- [x] Responsable on-call principal: `Edwin Torres`
+- [ ] Responsable backup: `Pendiente de asignar`
 
 ## 6) Política de rollback
 - [ ] Condición de rollback documentada
 - [ ] Comando/procedimiento validado
-- [ ] Tiempo máximo de rollback aceptado: `________`
+- [x] Tiempo máximo de rollback aceptado: `15 min`
 
 ## 7) Aprobación final
 - [ ] Autorizo go-live controlado con capital real bajo los límites definidos arriba.
 
-Firma responsable: `________________`
-Fecha/hora: `____-__-__ __:__`
+Firma responsable: `Edwin Torres (pendiente firma formal)`
+Fecha/hora: `2026-04-27 13:09 -05`
 
 ---
 

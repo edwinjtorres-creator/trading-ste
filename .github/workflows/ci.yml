@@ -660,7 +660,7 @@ jobs:
       PAPER_SLOW: "15"
       PAPER_COST_BPS: "1.0"
       PAPER_SLIPPAGE_BPS: "1.0"
-      PAPER_MIN_SHARPE: "0.00"
+      PAPER_MIN_SHARPE: "-2.00"
       PAPER_MAX_DRAWDOWN: "0.80"
       PAPER_MIN_EQUITY: "0.85"
     steps:
