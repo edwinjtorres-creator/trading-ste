@@ -270,3 +270,47 @@ def test_get_ops_status_v1() -> None:
     assert "health" in d
     assert "check" in d
     assert "phase_progress" in d
+
+
+def test_post_replay_v1_auth_token_required(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+    from ste.orchestration.app import build_app
+
+    monkeypatch.setenv("STE_API_TOKEN", "secret-123")
+    r = TestClient(build_app()).post("/v1/replay", json={"file_path": "x.parquet"})
+    assert r.status_code == 401
+    assert "x-api-key" in r.json()["detail"]
+
+
+def test_post_replay_v1_auth_token_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+    from ste.orchestration.app import build_app
+
+    monkeypatch.setenv("STE_API_TOKEN", "secret-123")
+    r = TestClient(build_app()).post(
+        "/v1/replay",
+        json={"file_path": "/tmp/ste_replay_404_test.parquet"},
+        headers={"x-api-key": "secret-123"},
+    )
+    assert r.status_code == 404
+
+
+def test_post_replay_v1_allowlist_blocks_outside(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+    from ste.orchestration.app import build_app
+
+    allowed_dir = tmp_path / "allowed"
+    allowed_dir.mkdir(parents=True, exist_ok=True)
+    outside_path = tmp_path / "outside.parquet"
+    monkeypatch.setenv("STE_REPLAY_ALLOWLIST", str(allowed_dir))
+    r = TestClient(build_app()).post(
+        "/v1/replay",
+        json={"file_path": outside_path.as_posix()},
+    )
+    assert r.status_code == 403
+    assert "allowlist" in r.json()["detail"]

@@ -4,6 +4,8 @@ API mínima de orquestación (Fase 3+). *FastAPI* es opcional en *dev* pobre.
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Any
 
 from ste import __version__
@@ -11,7 +13,7 @@ from ste import __version__
 
 def build_app():
     try:
-        from fastapi import Body, FastAPI, HTTPException
+        from fastapi import Body, FastAPI, Header, HTTPException
         from fastapi.encoders import jsonable_encoder
     except ImportError as e:
         raise RuntimeError("Instala *fastapi* (requirements/layers/04) para la API") from e
@@ -25,6 +27,47 @@ def build_app():
     )
 
     app = FastAPI(title="STE", version=__version__)
+    api_token = os.getenv("STE_API_TOKEN", "").strip()
+    allowlist_raw = os.getenv("STE_REPLAY_ALLOWLIST", "").strip()
+    allowlist_roots: list[Path] = []
+    if allowlist_raw:
+        for raw in allowlist_raw.split(","):
+            entry = raw.strip()
+            if not entry:
+                continue
+            p = Path(entry).expanduser()
+            if not p.is_absolute():
+                p = (Path.cwd() / p).resolve(strict=False)
+            else:
+                p = p.resolve(strict=False)
+            allowlist_roots.append(p)
+
+    def _authorize_and_validate_path(x_api_key: str | None, body: dict[str, Any]) -> None:
+        if api_token:
+            got = x_api_key or ""
+            if got != api_token:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Unauthorized: missing or invalid x-api-key",
+                )
+
+        if not allowlist_roots:
+            return
+        file_path = str(body.get("file_path", "")).strip()
+        if not file_path:
+            return
+        candidate = Path(file_path).expanduser()
+        if not candidate.is_absolute():
+            candidate = (Path.cwd() / candidate).resolve(strict=False)
+        else:
+            candidate = candidate.resolve(strict=False)
+        allowed = any(candidate == root or root in candidate.parents for root in allowlist_roots)
+        if not allowed:
+            joined = ", ".join(str(p) for p in allowlist_roots)
+            raise HTTPException(
+                status_code=403,
+                detail=f"file_path fuera de allowlist STE_REPLAY_ALLOWLIST: {joined}",
+            )
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
@@ -55,7 +98,10 @@ def build_app():
             422: {"description": "JSON inválido o parámetros fuera de rango"},
         },
     )
-    def replay_post(data: dict[str, Any] = Body(...)) -> ReplayResponse:
+    def replay_post(
+        x_api_key: str | None = Header(default=None, alias="x-api-key"),
+        data: dict[str, Any] = Body(...),
+    ) -> ReplayResponse:
         from ste.eval.paper_replay import (
             evaluate_replay_gates,
             replay_parquet_mtm,
@@ -68,6 +114,7 @@ def build_app():
         )
         from ste.risk import PolicyConfig
 
+        _authorize_and_validate_path(x_api_key, data)
         try:
             payload = ReplayRequest.model_validate(data)
         except ValidationError as e:
@@ -118,7 +165,10 @@ def build_app():
             422: {"description": "JSON inválido o parámetros fuera de rango"},
         },
     )
-    def eval_gate_post(data: dict[str, Any] = Body(...)) -> EvalGateResponse:
+    def eval_gate_post(
+        x_api_key: str | None = Header(default=None, alias="x-api-key"),
+        data: dict[str, Any] = Body(...),
+    ) -> EvalGateResponse:
         from ste.eval.paper_replay import evaluate_replay_gates, replay_parquet_mtm
         from ste.eval.replay_io import (
             PARQUET_REPLAY_READ_ERRORS,
@@ -127,6 +177,7 @@ def build_app():
         )
         from ste.risk import PolicyConfig
 
+        _authorize_and_validate_path(x_api_key, data)
         try:
             payload = ReplayRequest.model_validate(data)
         except ValidationError as e:

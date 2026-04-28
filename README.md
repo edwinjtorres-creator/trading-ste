@@ -33,7 +33,10 @@ Sistema de Trading Evolutivo (STE) — núcleo mínimo con **señal**, **régime
    curl -sS -X POST "http://127.0.0.1:8765/v1/replay" -H "Content-Type: application/json" \
      -d "{\"file_path\": \"C:/ruta/bares.parquet\", \"position_size\": 0.25, \"ignore_regime\": false}"
    ```
-   Misma lógica que `ste replay`; acepta también `cost_bps` y `slippage_bps` (impactan `equity_final` y `total_cost_frac`), y gates opcionales (`min_sharpe`, `max_drawdown`, `min_equity`) que devuelven `gate_passed`/`gate_failures` en la respuesta. En producción haría falta *auth* y *allowlist* de rutas.
+   Misma lógica que `ste replay`; acepta también `cost_bps` y `slippage_bps` (impactan `equity_final` y `total_cost_frac`), y gates opcionales (`min_sharpe`, `max_drawdown`, `min_equity`) que devuelven `gate_passed`/`gate_failures` en la respuesta.
+   Hardening disponible por entorno:
+   - `STE_API_TOKEN`: si está definido, requiere header `x-api-key` en `POST /v1/replay` y `POST /v1/eval-gate`.
+   - `STE_REPLAY_ALLOWLIST`: CSV de directorios permitidos para `file_path` (si se define, bloquea rutas fuera de esa allowlist con `403`).
    Endpoint corto de gates (ideal para orquestación externa / bots de CI):
 
    ```bash
