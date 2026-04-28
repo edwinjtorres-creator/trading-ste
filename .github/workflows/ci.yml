@@ -3,13 +3,7 @@ name: CI
 on:
   push:
     branches: [main, master]
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
   pull_request:
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
   workflow_dispatch:
     inputs:
       qg_size:
@@ -60,6 +54,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  docs-governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate critical operational docs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          required_files = {
+              "docs/GO_LIVE_APPROVAL.md": [
+                  "## 3) Riesgo (obligatorio)",
+                  "## 4) Criterios de despliegue",
+                  "## 7) Aprobación final",
+              ],
+              "docs/RUNBOOK.md": [
+                  "## Criterios de bloqueo",
+                  "## Respuesta rápida por tipo de fallo",
+                  "## Regla de seguridad",
+              ],
+              "docs/PHASES_CHECKLIST.json": [],
+          }
+
+          errors: list[str] = []
+          for rel, snippets in required_files.items():
+              p = Path(rel)
+              if not p.exists():
+                  errors.append(f"Falta archivo crítico: {rel}")
+                  continue
+              text = p.read_text(encoding="utf-8")
+              for s in snippets:
+                  if s not in text:
+                      errors.append(f"Sección requerida no encontrada en {rel}: {s}")
+
+          if errors:
+              print("docs-governance FAIL")
+              for e in errors:
+                  print(f"- {e}")
+              raise SystemExit(2)
+          print("docs-governance PASS")
+          PY
+
   lint:
     runs-on: ubuntu-latest
     strategy:
@@ -816,6 +853,7 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     needs:
+      - docs-governance
       - lint
       - test
       - env-check-profiles
@@ -831,6 +869,7 @@ jobs:
           from pathlib import Path
 
           results = {
+              "docs-governance": "${{ needs.docs-governance.result }}",
               "lint": "${{ needs.lint.result }}",
               "test": "${{ needs.test.result }}",
               "env-check-profiles": "${{ needs.env-check-profiles.result }}",
@@ -857,6 +896,7 @@ jobs:
               for s in (
                   results["lint"],
                   results["test"],
+                  results["docs-governance"],
                   results["env-check-profiles"],
                   results["quant-gate"],
                   results["walkforward-report"],
@@ -871,6 +911,7 @@ jobs:
               f"- Overall: {overall}",
               f"- lint: {mark(results['lint'])}",
               f"- test: {mark(results['test'])}",
+              f"- docs-governance: {mark(results['docs-governance'])}",
               f"- env-check-profiles: {mark(results['env-check-profiles'])}",
               f"- quant-gate: {mark(results['quant-gate'])}",
               f"- walkforward-report: {mark(results['walkforward-report'])}",

@@ -142,6 +142,7 @@ def _cmd_replay(ns: argparse.Namespace) -> int:
                 "position_size": ns.size,
                 "fast": ns.fast,
                 "slow": ns.slow,
+                "max_daily_loss_fraction": float(getattr(ns, "max_daily_loss", 0.01)),
                 "cost_bps": float(getattr(ns, "cost_bps", 0.0)),
                 "slippage_bps": float(getattr(ns, "slippage_bps", 0.0)),
                 "ignore_regime": ns.ignore_regime,
@@ -159,6 +160,7 @@ def _cmd_replay(ns: argparse.Namespace) -> int:
             position_size=cfg.position_size,
             fast=cfg.fast,
             slow=cfg.slow,
+            max_daily_loss_fraction=cfg.max_daily_loss_fraction,
             cost_bps=cfg.cost_bps,
             slippage_bps=cfg.slippage_bps,
             policy=pc,
@@ -221,6 +223,7 @@ def _cmd_eval_gate(ns: argparse.Namespace) -> int:
                 "position_size": ns.size,
                 "fast": ns.fast,
                 "slow": ns.slow,
+                "max_daily_loss_fraction": float(getattr(ns, "max_daily_loss", 0.01)),
                 "cost_bps": ns.cost_bps,
                 "slippage_bps": ns.slippage_bps,
                 "ignore_regime": ns.ignore_regime,
@@ -241,6 +244,7 @@ def _cmd_eval_gate(ns: argparse.Namespace) -> int:
             position_size=cfg.position_size,
             fast=cfg.fast,
             slow=cfg.slow,
+            max_daily_loss_fraction=cfg.max_daily_loss_fraction,
             cost_bps=cfg.cost_bps,
             slippage_bps=cfg.slippage_bps,
             policy=pc,
@@ -553,6 +557,12 @@ def main() -> int:
     s.add_argument("--size", type=float, default=0.25, help="Tamaño fraccionado (<=1)")
     s.add_argument("--fast", type=int, default=5)
     s.add_argument("--slow", type=int, default=15)
+    s.add_argument(
+        "--max-daily-loss",
+        type=float,
+        default=0.01,
+        help="Límite fraccional diario para kill switch durante replay",
+    )
     s.add_argument("--cost-bps", type=float, default=0.0, help="Coste por turnover (bps)")
     s.add_argument(
         "--slippage-bps", type=float, default=0.0, help="Slippage por turnover (bps)"
@@ -581,6 +591,12 @@ def main() -> int:
     s.add_argument("--size", type=float, default=0.25, help="Tamaño fraccionado (<=1)")
     s.add_argument("--fast", type=int, default=5)
     s.add_argument("--slow", type=int, default=15)
+    s.add_argument(
+        "--max-daily-loss",
+        type=float,
+        default=0.01,
+        help="Límite fraccional diario para kill switch durante eval-gate",
+    )
     s.add_argument(
         "--ignore-regime",
         action="store_true",

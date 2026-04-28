@@ -285,6 +285,45 @@ def test_ste_replay_cli_json_includes_gate_fields(
     assert '"gate_failures": []' in out
 
 
+def test_ste_replay_cli_passes_max_daily_loss(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from ste.__main__ import _cmd_replay
+
+    seen: dict[str, float] = {}
+
+    def _fake_replay(*args, **kwargs):
+        seen["max_daily_loss_fraction"] = float(kwargs.get("max_daily_loss_fraction", -1))
+        return {
+            "path": "x",
+            "equity_final": 1.01,
+            "sharpe": 0.5,
+            "max_drawdown": 0.1,
+            "total_cost_frac": 0.0,
+            "halted": False,
+            "returns": [],
+            "bar_times": [],
+            "equity_curve": [1.0],
+        }
+
+    monkeypatch.setattr("ste.eval.paper_replay.replay_parquet_mtm", _fake_replay)
+    ns = Namespace(
+        path=str(tmp_path / "g.parquet"),
+        size=0.25,
+        fast=5,
+        slow=15,
+        max_daily_loss=0.0075,
+        ignore_regime=True,
+        as_json=False,
+        csv=None,
+        min_sharpe=None,
+        max_drawdown=None,
+        min_equity=None,
+    )
+    assert _cmd_replay(ns) == 0
+    assert seen["max_daily_loss_fraction"] == 0.0075
+
+
 def test_eval_gate_pass(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     from ste.__main__ import _cmd_eval_gate
 

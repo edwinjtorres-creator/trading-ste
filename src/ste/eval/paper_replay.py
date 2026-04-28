@@ -18,6 +18,7 @@ def replay_parquet_mtm(
     position_size: float = 0.25,
     fast: int = 5,
     slow: int = 15,
+    max_daily_loss_fraction: float = 0.01,
     cost_bps: float = 0.0,
     slippage_bps: float = 0.0,
     policy: PolicyConfig | None = None,
@@ -45,7 +46,7 @@ def replay_parquet_mtm(
     sym = bars[0].symbol
     t0 = bars[0].open_time_utc
     closes = np.array([b.close for b in bars], dtype=np.float64)
-    risk = RiskState()
+    risk = RiskState(max_daily_loss_fraction=float(max_daily_loss_fraction))
     mtm = SequentialMarkToMarket()
     cfg = policy or PolicyConfig()
     curve: list[float] = [1.0]

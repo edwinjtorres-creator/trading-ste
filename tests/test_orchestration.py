@@ -99,6 +99,25 @@ def test_post_replay_v1_validation_422_position_size(tmp_path: Path) -> None:
     assert r.status_code == 422
 
 
+def test_post_replay_v1_validation_422_max_daily_loss(tmp_path: Path) -> None:
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+    from ste.orchestration.app import build_app
+
+    p = tmp_path / "y2.parquet"
+    p.write_text("y", encoding="utf-8")
+    r = TestClient(build_app()).post(
+        "/v1/replay",
+        json={
+            "file_path": p.as_posix(),
+            "position_size": 0.2,
+            "max_daily_loss_fraction": 1.5,
+            "ignore_regime": True,
+        },
+    )
+    assert r.status_code == 422
+
+
 def test_post_replay_v1_missing_file_404() -> None:
     pytest.importorskip("fastapi")
     from fastapi.testclient import TestClient

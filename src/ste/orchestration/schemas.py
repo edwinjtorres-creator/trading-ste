@@ -19,6 +19,9 @@ class ReplayRequest(BaseModel):
     )
     fast: int = Field(5, ge=1, description="Ventana EMA rápida (momentum)")
     slow: int = Field(15, ge=2, description="Ventana EMA lenta (debe ser > fast)")
+    max_daily_loss_fraction: float = Field(
+        0.01, gt=0.0, le=1.0, description="Límite de pérdida diaria fraccional para kill switch"
+    )
     cost_bps: float = Field(0.0, ge=0.0, description="Coste fijo por turnover en bps")
     slippage_bps: float = Field(0.0, ge=0.0, description="Slippage por turnover en bps")
     min_sharpe: float | None = Field(None, description="Gate opcional: sharpe mínimo")
