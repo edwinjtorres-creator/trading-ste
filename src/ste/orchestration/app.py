@@ -4,8 +4,11 @@ API mínima de orquestación (Fase 3+). *FastAPI* es opcional en *dev* pobre.
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
+from threading import Lock
+from time import time
 from typing import Any
 
 from ste import __version__
@@ -27,8 +30,18 @@ def build_app():
     )
 
     app = FastAPI(title="STE", version=__version__)
+    logger = logging.getLogger("ste.api")
     api_token = os.getenv("STE_API_TOKEN", "").strip()
     allowlist_raw = os.getenv("STE_REPLAY_ALLOWLIST", "").strip()
+    rate_limit_per_min = int(os.getenv("STE_API_RATE_LIMIT_PER_MIN", "60"))
+    audit_log_enabled = os.getenv("STE_API_AUDIT_LOG", "1").strip().lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+    rate_state: dict[str, tuple[int, int]] = {}
+    rate_lock = Lock()
     allowlist_roots: list[Path] = []
     if allowlist_raw:
         for raw in allowlist_raw.split(","):
@@ -42,19 +55,58 @@ def build_app():
                 p = p.resolve(strict=False)
             allowlist_roots.append(p)
 
-    def _authorize_and_validate_path(x_api_key: str | None, body: dict[str, Any]) -> None:
+    def _audit(endpoint: str, client_id: str, status: str, file_path: str = "") -> None:
+        if not audit_log_enabled:
+            return
+        short_path = Path(file_path).name if file_path else ""
+        logger.info(
+            "api_access endpoint=%s client=%s status=%s file=%s",
+            endpoint,
+            client_id,
+            status,
+            short_path,
+        )
+
+    def _enforce_rate_limit(endpoint: str, client_id: str) -> None:
+        if rate_limit_per_min <= 0:
+            return
+        now_bucket = int(time() // 60)
+        key = f"{endpoint}:{client_id}"
+        with rate_lock:
+            bucket, count = rate_state.get(key, (now_bucket, 0))
+            if bucket != now_bucket:
+                bucket, count = now_bucket, 0
+            count += 1
+            rate_state[key] = (bucket, count)
+        if count > rate_limit_per_min:
+            _audit(endpoint, client_id, "rate_limited")
+            raise HTTPException(
+                status_code=429,
+                detail=f"Rate limit exceeded ({rate_limit_per_min}/min)",
+            )
+
+    def _authorize_and_validate_path(
+        endpoint: str,
+        client_id: str,
+        x_api_key: str | None,
+        body: dict[str, Any],
+    ) -> None:
+        _enforce_rate_limit(endpoint, client_id)
         if api_token:
             got = x_api_key or ""
             if got != api_token:
+                _audit(endpoint, client_id, "unauthorized")
                 raise HTTPException(
                     status_code=401,
                     detail="Unauthorized: missing or invalid x-api-key",
                 )
 
         if not allowlist_roots:
+            _audit(endpoint, client_id, "authorized", str(body.get("file_path", "")))
             return
         file_path = str(body.get("file_path", "")).strip()
         if not file_path:
+            _audit(endpoint, client_id, "authorized")
             return
         candidate = Path(file_path).expanduser()
         if not candidate.is_absolute():
@@ -64,10 +116,12 @@ def build_app():
         allowed = any(candidate == root or root in candidate.parents for root in allowlist_roots)
         if not allowed:
             joined = ", ".join(str(p) for p in allowlist_roots)
+            _audit(endpoint, client_id, "forbidden_path", file_path)
             raise HTTPException(
                 status_code=403,
                 detail=f"file_path fuera de allowlist STE_REPLAY_ALLOWLIST: {joined}",
             )
+        _audit(endpoint, client_id, "authorized", file_path)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
@@ -100,6 +154,7 @@ def build_app():
     )
     def replay_post(
         x_api_key: str | None = Header(default=None, alias="x-api-key"),
+        x_forwarded_for: str | None = Header(default=None, alias="x-forwarded-for"),
         data: dict[str, Any] = Body(...),
     ) -> ReplayResponse:
         from ste.eval.paper_replay import (
@@ -114,7 +169,8 @@ def build_app():
         )
         from ste.risk import PolicyConfig
 
-        _authorize_and_validate_path(x_api_key, data)
+        client_id = ((x_forwarded_for or "").split(",")[0].strip()) or "local"
+        _authorize_and_validate_path("/v1/replay", client_id, x_api_key, data)
         try:
             payload = ReplayRequest.model_validate(data)
         except ValidationError as e:
@@ -167,6 +223,7 @@ def build_app():
     )
     def eval_gate_post(
         x_api_key: str | None = Header(default=None, alias="x-api-key"),
+        x_forwarded_for: str | None = Header(default=None, alias="x-forwarded-for"),
         data: dict[str, Any] = Body(...),
     ) -> EvalGateResponse:
         from ste.eval.paper_replay import evaluate_replay_gates, replay_parquet_mtm
@@ -177,7 +234,8 @@ def build_app():
         )
         from ste.risk import PolicyConfig
 
-        _authorize_and_validate_path(x_api_key, data)
+        client_id = ((x_forwarded_for or "").split(",")[0].strip()) or "local"
+        _authorize_and_validate_path("/v1/eval-gate", client_id, x_api_key, data)
         try:
             payload = ReplayRequest.model_validate(data)
         except ValidationError as e:

@@ -37,6 +37,8 @@ Sistema de Trading Evolutivo (STE) — núcleo mínimo con **señal**, **régime
    Hardening disponible por entorno:
    - `STE_API_TOKEN`: si está definido, requiere header `x-api-key` en `POST /v1/replay` y `POST /v1/eval-gate`.
    - `STE_REPLAY_ALLOWLIST`: CSV de directorios permitidos para `file_path` (si se define, bloquea rutas fuera de esa allowlist con `403`).
+   - `STE_API_RATE_LIMIT_PER_MIN`: límite por cliente y endpoint por minuto (`<=0` desactiva; default `60`).
+   - `STE_API_AUDIT_LOG`: auditoría mínima de accesos en logs (`1` default; `0/false/off` para desactivar).
    Endpoint corto de gates (ideal para orquestación externa / bots de CI):
 
    ```bash
@@ -44,7 +46,7 @@ Sistema de Trading Evolutivo (STE) — núcleo mínimo con **señal**, **régime
      -d "{\"file_path\": \"C:/ruta/bares.parquet\", \"ignore_regime\": true, \"min_sharpe\": 0.5, \"max_drawdown\": 0.25}"
    ```
    Respuesta compacta: `passed`, `failures`, `metrics` (`equity_final`, `sharpe`, `max_drawdown`, `total_cost_frac`, `halted`) y `path`.
-   **Códigos HTTP en `POST /v1/replay` y `POST /v1/eval-gate`:** `422` si el JSON no cumple el esquema (`position_size` en `(0,1]`, `slow` > `fast`, etc.); `404` si la ruta no existe; `400` si el archivo no es Parquet legible, está corrupto o no tiene el *schema* de bares STE (columnas / versión).
+   **Códigos HTTP en `POST /v1/replay` y `POST /v1/eval-gate`:** `422` si el JSON no cumple el esquema (`position_size` en `(0,1]`, `slow` > `fast`, etc.); `404` si la ruta no existe; `400` si el archivo no es Parquet legible, está corrupto o no tiene el *schema* de bares STE (columnas / versión); `401` si falta/incorrecto `x-api-key` cuando `STE_API_TOKEN` está activo; `403` para `file_path` fuera de allowlist; `429` por rate limit.
 7. **Stack completo por capas:** `python scripts/install_layers.py` (y `--include-optional` al final
    para TF/Ray en *optional*). Detalle en [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md). Alternativa:
    `python scripts/merge_requirements.py` y un solo `pip install -r requirements/all.txt` (más brusco).

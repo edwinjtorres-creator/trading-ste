@@ -314,3 +314,16 @@ def test_post_replay_v1_allowlist_blocks_outside(
     )
     assert r.status_code == 403
     assert "allowlist" in r.json()["detail"]
+
+
+def test_post_replay_v1_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+    from ste.orchestration.app import build_app
+
+    monkeypatch.setenv("STE_API_RATE_LIMIT_PER_MIN", "1")
+    c = TestClient(build_app())
+    r1 = c.post("/v1/replay", json={"file_path": "/tmp/ste_replay_404_test.parquet"})
+    assert r1.status_code == 404
+    r2 = c.post("/v1/replay", json={"file_path": "/tmp/ste_replay_404_test.parquet"})
+    assert r2.status_code == 429

@@ -51,6 +51,12 @@ Operar y monitorear STE en modo seguro (paper/LIVE_MIN smoke), con decisiones cl
 - Fases:
   - `python -m ste phase-status --json`
 
+## Hardening API recomendado
+- Activar `STE_API_TOKEN` y exigir `x-api-key` en `POST /v1/replay` y `POST /v1/eval-gate`.
+- Definir `STE_REPLAY_ALLOWLIST` con directorios permitidos para `file_path`.
+- Definir `STE_API_RATE_LIMIT_PER_MIN` (default recomendado: `60`; producción expuesta: `20-40` según carga).
+- Mantener `STE_API_AUDIT_LOG=1` para trazabilidad de accesos y rechazos (`401/403/429`).
+
 ## Regla de seguridad
 No usar capital real hasta que `live-min-smoke` y kill switch pasen de forma consistente y con evidencia en artefactos CI.
 
