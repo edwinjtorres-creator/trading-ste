@@ -6,8 +6,8 @@ Responsable: `Edwin Torres`
 ## 1) Broker / MT5
 - [ ] Cuenta MT5 confirmada (demo final o real)
 - [ ] Terminal MT5 en Windows validado
-- [ ] Micro-lote inicial aprobado: `________`
-- [ ] Símbolos permitidos: `________________`
+- [x] Micro-lote inicial aprobado: `0.01`
+- [x] Símbolos permitidos: `EURUSD, GBPUSD, USDJPY, GBPEUR, US500, USTECH, US30, XAUUSD, BTCUSD` (permitir equivalentes del broker con sufijos, p. ej. `m`)
 
 ## 2) Secrets y Acceso
 - [ ] Secrets cargados en GitHub (repo/org)
@@ -32,7 +32,7 @@ Responsable: `Edwin Torres`
 - [x] Fecha/hora de activación: `2026-04-27 18:00 UTC`
 - [x] Ventana de observación inicial: `24h`
 - [x] Responsable on-call principal: `Edwin Torres`
-- [ ] Responsable backup: `Pendiente de asignar`
+- [x] Responsable backup: `Edwin Torres`
 
 ## 6) Política de rollback
 - [x] Condición de rollback documentada
